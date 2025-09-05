@@ -48,7 +48,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".mp3,audio/mp3"
+          accept=".mp3,audio/mpeg,audio/mp3"
           multiple
           className="hidden"
           onChange={handleFileChange}

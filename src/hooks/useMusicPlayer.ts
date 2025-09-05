@@ -17,7 +17,9 @@ export const useMusicPlayer = () => {
     
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.type === 'audio/mp3') {
+      console.log('Processing file:', file.name, 'Type:', file.type);
+      // Accept various MP3 MIME types
+      if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
         const url = URL.createObjectURL(file);
         
         // Créer un élément audio temporaire pour obtenir la durée
