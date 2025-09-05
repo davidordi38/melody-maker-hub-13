@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Music2 } from 'lucide-react';
+import { Music2, Play } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { FileUpload } from '@/components/FileUpload';
 import { SearchBar } from '@/components/SearchBar';
@@ -19,6 +20,9 @@ const Index = () => {
     togglePlayPause,
     playNext,
     playPrevious,
+    shufflePlay,
+    playAllSongs,
+    playPlaylist,
     createPlaylist,
     deletePlaylist,
     addSongToPlaylist,
@@ -89,7 +93,7 @@ const Index = () => {
               <Music2 className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">MusicPlayer</h1>
+              <h1 className="text-2xl font-bold text-foreground">MyMusic</h1>
               <p className="text-muted-foreground">Votre bibliothèque musicale personnelle</p>
             </div>
           </div>
@@ -130,14 +134,25 @@ const Index = () => {
             </div>
 
             {/* Current View Title */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-foreground">
-                {selectedPlaylist ? selectedPlaylist.name : 'Toutes les musiques'}
-              </h2>
-              <p className="text-muted-foreground">
-                {displayedSongs.length} chanson{displayedSongs.length !== 1 ? 's' : ''}
-                {searchQuery && ` • Recherche: "${searchQuery}"`}
-              </p>
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {selectedPlaylist ? selectedPlaylist.name : 'Toutes les musiques'}
+                </h2>
+                <p className="text-muted-foreground">
+                  {displayedSongs.length} chanson{displayedSongs.length !== 1 ? 's' : ''}
+                  {searchQuery && ` • Recherche: "${searchQuery}"`}
+                </p>
+              </div>
+              {displayedSongs.length > 0 && (
+                <Button
+                  onClick={() => selectedPlaylist ? playPlaylist(selectedPlaylist) : playAllSongs()}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Lancer {selectedPlaylist ? 'la playlist' : 'toutes les musiques'}
+                </Button>
+              )}
             </div>
 
             {/* Songs List */}
@@ -182,6 +197,7 @@ const Index = () => {
         onPlayPause={togglePlayPause}
         onNext={playNext}
         onPrevious={playPrevious}
+        onShuffle={shufflePlay}
         queue={playerState.queue}
       />
     </div>
