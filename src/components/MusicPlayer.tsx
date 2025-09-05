@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Shuffle } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Song } from '@/types/music';
@@ -10,7 +10,6 @@ interface MusicPlayerProps {
   onPlayPause: () => void;
   onNext: () => void;
   onPrevious: () => void;
-  onShuffle: () => void;
   queue: Song[];
 }
 
@@ -20,7 +19,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   onPlayPause,
   onNext,
   onPrevious,
-  onShuffle,
   queue
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -128,17 +126,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           {/* Controls */}
           <div className="flex flex-col items-center gap-2 flex-1">
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onShuffle}
-                disabled={!currentSong}
-                className="text-foreground hover:text-primary hover:bg-music-surface-hover"
-                title="Lecture aléatoire"
-              >
-                <Shuffle className="h-4 w-4" />
-              </Button>
-              
               <Button
                 variant="ghost"
                 size="sm"

@@ -20,7 +20,6 @@ const Index = () => {
     togglePlayPause,
     playNext,
     playPrevious,
-    shufflePlay,
     playAllSongs,
     playPlaylist,
     createPlaylist,
@@ -197,7 +196,6 @@ const Index = () => {
         onPlayPause={togglePlayPause}
         onNext={playNext}
         onPrevious={playPrevious}
-        onShuffle={shufflePlay}
         queue={playerState.queue}
       />
     </div>

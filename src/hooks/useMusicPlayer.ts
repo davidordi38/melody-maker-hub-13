@@ -128,13 +128,6 @@ export const useMusicPlayer = () => {
     return songs.filter(song => playlist.songs.includes(song.id));
   }, [songs]);
 
-  const shufflePlay = useCallback(() => {
-    if (songs.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * songs.length);
-    const randomSong = songs[randomIndex];
-    playSong(randomSong, songs);
-  }, [songs, playSong]);
-
   const playAllSongs = useCallback(() => {
     if (songs.length === 0) return;
     playSong(songs[0], songs);
@@ -155,7 +148,6 @@ export const useMusicPlayer = () => {
     togglePlayPause,
     playNext,
     playPrevious,
-    shufflePlay,
     playAllSongs,
     playPlaylist,
     createPlaylist,
