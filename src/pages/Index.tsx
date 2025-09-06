@@ -8,19 +8,27 @@ import { SearchBar } from '@/components/SearchBar';
 import { SongCard } from '@/components/SongCard';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { CollectionManager } from '@/components/CollectionManager';
-import { Song } from '@/types/music';
+import { PlaylistManager } from '@/components/PlaylistManager';
+import { Song, Playlist } from '@/types/music';
 import { MusicCollection } from '@/types/collection';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const {
     songs,
+    playlists,
     playerState,
     addSongs,
     playSong,
     togglePlayPause,
     playNext,
     playPrevious,
+    playAllSongs,
+    playPlaylist,
+    createPlaylist,
+    deletePlaylist,
+    addSongToPlaylist,
+    getPlaylistSongs,
   } = useMusicPlayer();
 
   const {
@@ -33,6 +41,8 @@ const Index = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCollection, setSelectedCollection] = useState<MusicCollection | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [currentView, setCurrentView] = useState<'all' | 'collections' | 'playlists'>('all');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingToCollection, setUploadingToCollection] = useState<string | null>(null);
   const { toast } = useToast();
@@ -79,12 +89,28 @@ const Index = () => {
   };
 
   const handleSongPlay = (song: Song) => {
-    const currentSongs = selectedCollection ? getCollectionSongs(selectedCollection, songs) : songs;
+    let currentSongs = songs;
+    
+    if (selectedCollection) {
+      currentSongs = getCollectionSongs(selectedCollection, songs);
+    } else if (selectedPlaylist) {
+      currentSongs = getPlaylistSongs(selectedPlaylist);
+    }
+    
     if (playerState.currentSong?.id === song.id) {
       togglePlayPause();
     } else {
       playSong(song, currentSongs);
     }
+  };
+
+  const handleAddToPlaylist = (songId: string, playlistId: string) => {
+    addSongToPlaylist(songId, playlistId);
+    const playlist = playlists.find(p => p.id === playlistId);
+    toast({
+      title: "Chanson ajoutée",
+      description: `Chanson ajoutée à la playlist "${playlist?.name}".`,
+    });
   };
 
   const handlePlayCollection = (collection: MusicCollection) => {
@@ -114,13 +140,32 @@ const Index = () => {
   };
 
   const filteredSongs = () => {
-    const currentSongs = selectedCollection ? getCollectionSongs(selectedCollection, songs) : songs;
+    let currentSongs = songs;
+    
+    if (selectedCollection) {
+      currentSongs = getCollectionSongs(selectedCollection, songs);
+    } else if (selectedPlaylist) {
+      currentSongs = getPlaylistSongs(selectedPlaylist);
+    }
+    
     if (!searchQuery) return currentSongs;
     
     return currentSongs.filter(song =>
       song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (song.artist && song.artist.toLowerCase().includes(searchQuery.toLowerCase()))
     );
+  };
+
+  const getCurrentViewTitle = () => {
+    if (selectedCollection) return selectedCollection.name;
+    if (selectedPlaylist) return selectedPlaylist.name;
+    return 'Toutes les musiques';
+  };
+
+  const handleViewChange = (view: 'all' | 'collections' | 'playlists') => {
+    setCurrentView(view);
+    setSelectedCollection(null);
+    setSelectedPlaylist(null);
   };
 
   const getSongCount = (collection: MusicCollection) => {
@@ -169,19 +214,60 @@ const Index = () => {
 
         {songs.length > 0 && (
           <>
-            {/* Collection Manager */}
+            {/* Navigation Tabs */}
             <div className="mb-8">
-              <CollectionManager
-                collections={collections}
-                selectedCollection={selectedCollection}
-                onCreateCollection={createCollection}
-                onSelectCollection={setSelectedCollection}
-                onDeleteCollection={deleteCollection}
-                onPlayCollection={handlePlayCollection}
-                onUploadToCollection={handleUploadToCollection}
-                getSongCount={getSongCount}
-                totalSongs={songs.length}
-              />
+              <div className="flex gap-4 mb-6">
+                <Button
+                  variant={currentView === 'all' ? 'default' : 'outline'}
+                  onClick={() => handleViewChange('all')}
+                >
+                  Toutes les musiques ({songs.length})
+                </Button>
+                <Button
+                  variant={currentView === 'collections' ? 'default' : 'outline'}
+                  onClick={() => handleViewChange('collections')}
+                >
+                  Collections ({collections.length})
+                </Button>
+                <Button
+                  variant={currentView === 'playlists' ? 'default' : 'outline'}
+                  onClick={() => handleViewChange('playlists')}
+                >
+                  Playlists ({playlists.length})
+                </Button>
+              </div>
+
+              {/* Collection Manager */}
+              {currentView === 'collections' && (
+                <CollectionManager
+                  collections={collections}
+                  selectedCollection={selectedCollection}
+                  onCreateCollection={createCollection}
+                  onSelectCollection={(collection) => {
+                    setSelectedCollection(collection);
+                    setSelectedPlaylist(null);
+                  }}
+                  onDeleteCollection={deleteCollection}
+                  onPlayCollection={handlePlayCollection}
+                  onUploadToCollection={handleUploadToCollection}
+                  getSongCount={getSongCount}
+                  totalSongs={songs.length}
+                />
+              )}
+
+              {/* Playlist Manager */}
+              {currentView === 'playlists' && (
+                <PlaylistManager
+                  playlists={playlists}
+                  onCreatePlaylist={createPlaylist}
+                  onDeletePlaylist={deletePlaylist}
+                  onSelectPlaylist={(playlist) => {
+                    setSelectedPlaylist(playlist);
+                    setSelectedCollection(null);
+                  }}
+                  selectedPlaylist={selectedPlaylist}
+                />
+              )}
             </div>
 
             {/* Search and Add More */}
@@ -190,34 +276,44 @@ const Index = () => {
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}
-                  placeholder={selectedCollection ? `Rechercher dans ${selectedCollection.name}...` : "Rechercher une chanson..."}
+                  placeholder={`Rechercher dans ${getCurrentViewTitle()}...`}
                 />
               </div>
-              <CompactFileUpload
-                onFilesSelected={(files) => handleFilesSelected(files)}
-                isUploading={isUploading}
-                variant="compact"
-              />
+              {currentView !== 'playlists' && (
+                <CompactFileUpload
+                  onFilesSelected={(files) => handleFilesSelected(files)}
+                  isUploading={isUploading}
+                  variant="compact"
+                />
+              )}
             </div>
 
             {/* Current View Title */}
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {selectedCollection ? selectedCollection.name : 'Toutes les musiques'}
+                  {getCurrentViewTitle()}
                 </h2>
                 <p className="text-muted-foreground">
                   {displayedSongs.length} chanson{displayedSongs.length !== 1 ? 's' : ''}
                   {searchQuery && ` • Recherche: "${searchQuery}"`}
                 </p>
               </div>
-              {displayedSongs.length > 0 && (
+              {displayedSongs.length > 0 && (currentView === 'all' || selectedCollection || selectedPlaylist) && (
                 <Button
-                  onClick={() => selectedCollection ? handlePlayCollection(selectedCollection) : handlePlayAllSongs()}
+                  onClick={() => {
+                    if (selectedCollection) {
+                      handlePlayCollection(selectedCollection);
+                    } else if (selectedPlaylist) {
+                      playPlaylist(selectedPlaylist);
+                    } else {
+                      handlePlayAllSongs();
+                    }
+                  }}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  Lancer {selectedCollection ? 'la collection' : 'toutes les musiques'}
+                  Lancer {selectedCollection ? 'la collection' : selectedPlaylist ? 'la playlist' : 'toutes les musiques'}
                 </Button>
               )}
             </div>
@@ -232,8 +328,8 @@ const Index = () => {
                     isPlaying={playerState.isPlaying}
                     isCurrentSong={playerState.currentSong?.id === song.id}
                     onPlay={() => handleSongPlay(song)}
-                    onAddToPlaylist={() => {}}
-                    playlists={[]}
+                    onAddToPlaylist={(playlistId) => handleAddToPlaylist(song.id, playlistId)}
+                    playlists={playlists}
                   />
                 ))
               ) : (
