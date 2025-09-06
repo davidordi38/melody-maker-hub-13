@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
-import { Song, Playlist, MusicPlayerState } from '@/types/music';
+import { Song, MusicPlayerState } from '@/types/music';
 
 export const useMusicPlayer = () => {
   const [songs, setSongs] = useState<Song[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playerState, setPlayerState] = useState<MusicPlayerState>({
     currentSong: null,
     isPlaying: false,
@@ -96,63 +95,14 @@ export const useMusicPlayer = () => {
     });
   }, []);
 
-  const createPlaylist = useCallback((name: string) => {
-    const playlist: Playlist = {
-      id: `playlist-${Date.now()}`,
-      name,
-      songs: [],
-      createdAt: new Date(),
-    };
-    
-    setPlaylists(prev => [...prev, playlist]);
-    return playlist;
-  }, []);
-
-  const deletePlaylist = useCallback((id: string) => {
-    setPlaylists(prev => prev.filter(p => p.id !== id));
-  }, []);
-
-  const addSongToPlaylist = useCallback((songId: string, playlistId: string) => {
-    setPlaylists(prev => prev.map(playlist => {
-      if (playlist.id === playlistId) {
-        return {
-          ...playlist,
-          songs: [...playlist.songs, songId],
-        };
-      }
-      return playlist;
-    }));
-  }, []);
-
-  const getPlaylistSongs = useCallback((playlist: Playlist) => {
-    return songs.filter(song => playlist.songs.includes(song.id));
-  }, [songs]);
-
-  const playAllSongs = useCallback(() => {
-    if (songs.length === 0) return;
-    playSong(songs[0], songs);
-  }, [songs, playSong]);
-
-  const playPlaylist = useCallback((playlist: Playlist) => {
-    const playlistSongs = getPlaylistSongs(playlist);
-    if (playlistSongs.length === 0) return;
-    playSong(playlistSongs[0], playlistSongs);
-  }, [getPlaylistSongs, playSong]);
 
   return {
     songs,
-    playlists,
     playerState,
     addSongs,
     playSong,
     togglePlayPause,
     playNext,
     playPrevious,
-    playAllSongs,
-    playPlaylist,
-    createPlaylist,
-    deletePlaylist,
-    addSongToPlaylist,
-    getPlaylistSongs,
   };
 };

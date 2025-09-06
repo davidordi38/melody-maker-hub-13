@@ -2,45 +2,67 @@ import React, { useState } from 'react';
 import { Music2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { FileUpload } from '@/components/FileUpload';
+import { useCollections } from '@/hooks/useCollections';
+import { CompactFileUpload } from '@/components/CompactFileUpload';
 import { SearchBar } from '@/components/SearchBar';
 import { SongCard } from '@/components/SongCard';
 import { MusicPlayer } from '@/components/MusicPlayer';
-import { PlaylistManager } from '@/components/PlaylistManager';
-import { Song, Playlist } from '@/types/music';
+import { CollectionManager } from '@/components/CollectionManager';
+import { Song } from '@/types/music';
+import { MusicCollection } from '@/types/collection';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const {
     songs,
-    playlists,
     playerState,
     addSongs,
     playSong,
     togglePlayPause,
     playNext,
     playPrevious,
-    playAllSongs,
-    playPlaylist,
-    createPlaylist,
-    deletePlaylist,
-    addSongToPlaylist,
-    getPlaylistSongs,
   } = useMusicPlayer();
 
+  const {
+    collections,
+    createCollection,
+    deleteCollection,
+    addSongsToCollection,
+    getCollectionSongs,
+  } = useCollections();
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<MusicCollection | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingToCollection, setUploadingToCollection] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleFilesSelected = async (files: FileList) => {
-    setIsUploading(true);
+  const handleFilesSelected = async (files: FileList, collectionId?: string) => {
+    const isUploadingToSpecificCollection = !!collectionId;
+    
+    if (isUploadingToSpecificCollection) {
+      setUploadingToCollection(collectionId);
+    } else {
+      setIsUploading(true);
+    }
+    
     try {
       const newSongs = await addSongs(files);
-      toast({
-        title: "Musiques importées",
-        description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} ajoutée${newSongs.length !== 1 ? 's' : ''} avec succès.`,
-      });
+      
+      if (collectionId && newSongs.length > 0) {
+        const songIds = newSongs.map(song => song.id);
+        addSongsToCollection(songIds, collectionId);
+        const collection = collections.find(c => c.id === collectionId);
+        toast({
+          title: "Musiques ajoutées",
+          description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} ajoutée${newSongs.length !== 1 ? 's' : ''} à "${collection?.name}".`,
+        });
+      } else {
+        toast({
+          title: "Musiques importées",
+          description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} importée${newSongs.length !== 1 ? 's' : ''} avec succès.`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Erreur d'importation",
@@ -48,12 +70,16 @@ const Index = () => {
         variant: "destructive",
       });
     } finally {
-      setIsUploading(false);
+      if (isUploadingToSpecificCollection) {
+        setUploadingToCollection(null);
+      } else {
+        setIsUploading(false);
+      }
     }
   };
 
   const handleSongPlay = (song: Song) => {
-    const currentSongs = selectedPlaylist ? getPlaylistSongs(selectedPlaylist) : songs;
+    const currentSongs = selectedCollection ? getCollectionSongs(selectedCollection, songs) : songs;
     if (playerState.currentSong?.id === song.id) {
       togglePlayPause();
     } else {
@@ -61,23 +87,44 @@ const Index = () => {
     }
   };
 
-  const handleAddToPlaylist = (songId: string, playlistId: string) => {
-    addSongToPlaylist(songId, playlistId);
-    const playlist = playlists.find(p => p.id === playlistId);
-    toast({
-      title: "Chanson ajoutée",
-      description: `Chanson ajoutée à la playlist "${playlist?.name}".`,
-    });
+  const handlePlayCollection = (collection: MusicCollection) => {
+    const collectionSongs = getCollectionSongs(collection, songs);
+    if (collectionSongs.length > 0) {
+      playSong(collectionSongs[0], collectionSongs);
+    }
+  };
+
+  const handlePlayAllSongs = () => {
+    if (songs.length === 0) return;
+    playSong(songs[0], songs);
+  };
+
+  const handleUploadToCollection = (collection: MusicCollection) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.mp3,audio/mpeg,audio/mp3';
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        handleFilesSelected(files, collection.id);
+      }
+    };
+    input.click();
   };
 
   const filteredSongs = () => {
-    const currentSongs = selectedPlaylist ? getPlaylistSongs(selectedPlaylist) : songs;
+    const currentSongs = selectedCollection ? getCollectionSongs(selectedCollection, songs) : songs;
     if (!searchQuery) return currentSongs;
     
     return currentSongs.filter(song =>
       song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (song.artist && song.artist.toLowerCase().includes(searchQuery.toLowerCase()))
     );
+  };
+
+  const getSongCount = (collection: MusicCollection) => {
+    return getCollectionSongs(collection, songs).length;
   };
 
   const displayedSongs = filteredSongs();
@@ -102,21 +149,38 @@ const Index = () => {
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         {/* Upload Section */}
         {songs.length === 0 && (
-          <div className="mb-8">
-            <FileUpload onFilesSelected={handleFilesSelected} isUploading={isUploading} />
+          <div className="mb-8 text-center">
+            <div className="max-w-md mx-auto">
+              <Music2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                Bienvenue dans MyMusic
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                Commencez par importer vos premières musiques pour créer votre bibliothèque personnelle.
+              </p>
+              <CompactFileUpload
+                onFilesSelected={(files) => handleFilesSelected(files)}
+                isUploading={isUploading}
+                text="Importer mes musiques"
+              />
+            </div>
           </div>
         )}
 
         {songs.length > 0 && (
           <>
-            {/* Playlist Manager */}
+            {/* Collection Manager */}
             <div className="mb-8">
-              <PlaylistManager
-                playlists={playlists}
-                onCreatePlaylist={createPlaylist}
-                onDeletePlaylist={deletePlaylist}
-                onSelectPlaylist={setSelectedPlaylist}
-                selectedPlaylist={selectedPlaylist}
+              <CollectionManager
+                collections={collections}
+                selectedCollection={selectedCollection}
+                onCreateCollection={createCollection}
+                onSelectCollection={setSelectedCollection}
+                onDeleteCollection={deleteCollection}
+                onPlayCollection={handlePlayCollection}
+                onUploadToCollection={handleUploadToCollection}
+                getSongCount={getSongCount}
+                totalSongs={songs.length}
               />
             </div>
 
@@ -126,17 +190,21 @@ const Index = () => {
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}
-                  placeholder={selectedPlaylist ? `Rechercher dans ${selectedPlaylist.name}...` : "Rechercher une chanson..."}
+                  placeholder={selectedCollection ? `Rechercher dans ${selectedCollection.name}...` : "Rechercher une chanson..."}
                 />
               </div>
-              <FileUpload onFilesSelected={handleFilesSelected} isUploading={isUploading} />
+              <CompactFileUpload
+                onFilesSelected={(files) => handleFilesSelected(files)}
+                isUploading={isUploading}
+                variant="compact"
+              />
             </div>
 
             {/* Current View Title */}
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {selectedPlaylist ? selectedPlaylist.name : 'Toutes les musiques'}
+                  {selectedCollection ? selectedCollection.name : 'Toutes les musiques'}
                 </h2>
                 <p className="text-muted-foreground">
                   {displayedSongs.length} chanson{displayedSongs.length !== 1 ? 's' : ''}
@@ -145,11 +213,11 @@ const Index = () => {
               </div>
               {displayedSongs.length > 0 && (
                 <Button
-                  onClick={() => selectedPlaylist ? playPlaylist(selectedPlaylist) : playAllSongs()}
+                  onClick={() => selectedCollection ? handlePlayCollection(selectedCollection) : handlePlayAllSongs()}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  Lancer {selectedPlaylist ? 'la playlist' : 'toutes les musiques'}
+                  Lancer {selectedCollection ? 'la collection' : 'toutes les musiques'}
                 </Button>
               )}
             </div>
@@ -164,21 +232,21 @@ const Index = () => {
                     isPlaying={playerState.isPlaying}
                     isCurrentSong={playerState.currentSong?.id === song.id}
                     onPlay={() => handleSongPlay(song)}
-                    onAddToPlaylist={(playlistId) => handleAddToPlaylist(song.id, playlistId)}
-                    playlists={playlists}
+                    onAddToPlaylist={() => {}}
+                    playlists={[]}
                   />
                 ))
               ) : (
                 <div className="text-center py-12">
                   <Music2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-foreground mb-2">
-                    {searchQuery ? 'Aucune chanson trouvée' : 'Aucune chanson dans cette playlist'}
+                    {searchQuery ? 'Aucune chanson trouvée' : selectedCollection ? 'Aucune chanson dans cette collection' : 'Aucune chanson'}
                   </h3>
                   <p className="text-muted-foreground">
                     {searchQuery 
                       ? 'Essayez de modifier votre recherche' 
-                      : selectedPlaylist 
-                        ? 'Ajoutez des chansons à cette playlist' 
+                      : selectedCollection 
+                        ? 'Utilisez le bouton "Upload" sur la collection pour ajouter des musiques' 
                         : 'Importez vos premières musiques'
                     }
                   </p>
