@@ -25,51 +25,51 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
 }) => {
   return (
     <Card
-      className={`p-4 cursor-pointer transition-all duration-300 hover:bg-music-surface-hover group ${
-        isSelected ? 'ring-2 ring-primary' : ''
+      className={`p-5 cursor-pointer transition-all duration-300 hover:bg-music-surface-hover border-2 ${
+        isSelected ? 'border-primary bg-primary/5 shadow-md' : 'border-border'
       }`}
       onClick={onSelect}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1" onClick={onSelect}>
-          <div className="p-2 rounded bg-primary/10">
-            <Folder className="h-6 w-6 text-primary" />
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-primary/10">
+            <Folder className="h-7 w-7 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-foreground">{collection.name}</h3>
+            <h3 className="font-semibold text-foreground text-lg">{collection.name}</h3>
             <p className="text-sm text-muted-foreground">
               {songCount} chanson{songCount !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
           {songCount > 0 && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 onPlay();
               }}
-              className="text-primary hover:text-primary-hover"
-              title="Lire la collection"
+              className="flex-1 gap-2"
             >
               <Play className="h-4 w-4" />
+              Lire
             </Button>
           )}
           
           <Button
-            variant="ghost"
+            variant="default"
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
               onUpload();
             }}
-            className="text-foreground hover:text-primary"
-            title="Ajouter des musiques"
+            className="flex-1 gap-2"
           >
             <Upload className="h-4 w-4" />
+            Ajouter
           </Button>
           
           <Button
@@ -79,8 +79,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
               e.stopPropagation();
               onDelete();
             }}
-            className="text-destructive hover:text-destructive"
-            title="Supprimer la collection"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
           >
             <Trash2 className="h-4 w-4" />
           </Button>

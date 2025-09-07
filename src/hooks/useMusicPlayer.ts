@@ -15,35 +15,66 @@ export const useMusicPlayer = () => {
   const addSongs = useCallback(async (files: FileList) => {
     const newSongs: Song[] = [];
     
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      console.log('Processing file:', file.name, 'Type:', file.type);
-      // Accept various MP3 MIME types
-      if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
-        const url = URL.createObjectURL(file);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log('Processing file:', file.name, 'Type:', file.type);
         
-        // Créer un élément audio temporaire pour obtenir la durée
-        const audio = new Audio(url);
-        const duration = await new Promise<number>((resolve) => {
-          audio.addEventListener('loadedmetadata', () => {
-            resolve(audio.duration);
-          });
-        });
+        // Accept various MP3 MIME types
+        if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
+          const url = URL.createObjectURL(file);
+          
+          try {
+            // Créer un élément audio temporaire pour obtenir la durée
+            const audio = new Audio(url);
+            const duration = await new Promise<number>((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error('Timeout loading metadata'));
+              }, 5000);
 
-        const song: Song = {
-          id: `song-${Date.now()}-${i}`,
-          title: file.name.replace('.mp3', ''),
-          duration,
-          file,
-          url,
-        };
-        
-        newSongs.push(song);
+              audio.addEventListener('loadedmetadata', () => {
+                clearTimeout(timeout);
+                resolve(audio.duration || 0);
+              });
+
+              audio.addEventListener('error', () => {
+                clearTimeout(timeout);
+                reject(new Error('Error loading audio'));
+              });
+
+              audio.load();
+            });
+
+            const song: Song = {
+              id: `song-${Date.now()}-${i}-${Math.random()}`,
+              title: file.name.replace(/\.(mp3|mp4|m4a)$/i, ''),
+              duration,
+              file,
+              url,
+            };
+            
+            newSongs.push(song);
+          } catch (error) {
+            console.error('Error processing file:', file.name, error);
+            // Create song without duration if metadata fails
+            const song: Song = {
+              id: `song-${Date.now()}-${i}-${Math.random()}`,
+              title: file.name.replace(/\.(mp3|mp4|m4a)$/i, ''),
+              duration: 0,
+              file,
+              url,
+            };
+            newSongs.push(song);
+          }
+        }
       }
+      
+      setSongs(prevSongs => [...prevSongs, ...newSongs]);
+      return newSongs;
+    } catch (error) {
+      console.error('Error in addSongs:', error);
+      return [];
     }
-    
-    setSongs(prevSongs => [...prevSongs, ...newSongs]);
-    return newSongs;
   }, []);
 
   const playSong = useCallback((song: Song, queue?: Song[]) => {
