@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Music2, Play } from 'lucide-react';
+import { Music2, Play, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useCollections } from '@/hooks/useCollections';
-import { CompactFileUpload } from '@/components/CompactFileUpload';
 import { SearchBar } from '@/components/SearchBar';
 import { SongCard } from '@/components/SongCard';
 import { MusicPlayer } from '@/components/MusicPlayer';
@@ -148,6 +147,20 @@ const Index = () => {
     input.click();
   };
 
+  const handleGeneralUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.mp3,audio/mpeg,audio/mp3';
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        handleFilesSelected(files);
+      }
+    };
+    input.click();
+  };
+
   const filteredSongs = () => {
     let currentSongs = songs;
     
@@ -212,11 +225,23 @@ const Index = () => {
               <p className="text-muted-foreground mb-6">
                 Commencez par importer vos premières musiques pour créer votre bibliothèque personnelle.
               </p>
-              <CompactFileUpload
-                onFilesSelected={(files) => handleFilesSelected(files)}
-                isUploading={isUploading}
-                text="Importer mes musiques"
-              />
+              <button
+                onClick={handleGeneralUpload}
+                disabled={isUploading}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Importation...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Importer mes musiques
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -289,11 +314,23 @@ const Index = () => {
                 />
               </div>
               {currentView !== 'playlists' && (
-                <CompactFileUpload
-                  onFilesSelected={(files) => handleFilesSelected(files)}
-                  isUploading={isUploading}
-                  variant="compact"
-                />
+                <button
+                  onClick={handleGeneralUpload}
+                  disabled={isUploading}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
+                >
+                  {isUploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Ajout...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Ajouter des musiques
+                    </>
+                  )}
+                </button>
               )}
             </div>
 
