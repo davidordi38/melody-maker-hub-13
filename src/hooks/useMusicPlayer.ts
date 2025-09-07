@@ -18,7 +18,7 @@ export const useMusicPlayer = () => {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        console.log('Processing file:', file.name, 'Type:', file.type);
+        console.log(`Processing file ${i + 1}/${files.length}:`, file.name, 'Type:', file.type);
         
         // Accept various MP3 MIME types
         if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
@@ -27,26 +27,30 @@ export const useMusicPlayer = () => {
           try {
             // Créer un élément audio temporaire pour obtenir la durée
             const audio = new Audio(url);
-            const duration = await new Promise<number>((resolve, reject) => {
+            const duration = await new Promise<number>((resolve) => {
               const timeout = setTimeout(() => {
-                reject(new Error('Timeout loading metadata'));
-              }, 5000);
+                console.warn(`Timeout loading metadata for ${file.name}, using default duration`);
+                resolve(0);
+              }, 3000); // Reduced timeout
 
               audio.addEventListener('loadedmetadata', () => {
                 clearTimeout(timeout);
+                console.log(`Loaded metadata for ${file.name}, duration:`, audio.duration);
                 resolve(audio.duration || 0);
               });
 
-              audio.addEventListener('error', () => {
+              audio.addEventListener('error', (e) => {
                 clearTimeout(timeout);
-                reject(new Error('Error loading audio'));
+                console.warn(`Error loading metadata for ${file.name}:`, e);
+                resolve(0);
               });
 
+              // Force load
               audio.load();
             });
 
             const song: Song = {
-              id: `song-${Date.now()}-${i}-${Math.random()}`,
+              id: `song-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
               title: file.name.replace(/\.(mp3|mp4|m4a)$/i, ''),
               duration,
               file,
@@ -54,21 +58,26 @@ export const useMusicPlayer = () => {
             };
             
             newSongs.push(song);
+            console.log(`Successfully processed ${file.name}`);
           } catch (error) {
-            console.error('Error processing file:', file.name, error);
+            console.error(`Error processing file ${file.name}:`, error);
             // Create song without duration if metadata fails
             const song: Song = {
-              id: `song-${Date.now()}-${i}-${Math.random()}`,
+              id: `song-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
               title: file.name.replace(/\.(mp3|mp4|m4a)$/i, ''),
               duration: 0,
               file,
               url,
             };
             newSongs.push(song);
+            console.log(`Created song without metadata for ${file.name}`);
           }
+        } else {
+          console.warn(`Skipped non-MP3 file: ${file.name}`);
         }
       }
       
+      console.log(`Total songs processed: ${newSongs.length} out of ${files.length} files`);
       setSongs(prevSongs => [...prevSongs, ...newSongs]);
       return newSongs;
     } catch (error) {
