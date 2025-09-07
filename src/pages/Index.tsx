@@ -57,7 +57,9 @@ const Index = () => {
     }
     
     try {
+      console.log('Starting upload of', files.length, 'files');
       const newSongs = await addSongs(files);
+      console.log('Upload completed, received', newSongs.length, 'songs');
       
       if (collectionId && newSongs.length > 0) {
         const songIds = newSongs.map(song => song.id);
@@ -67,13 +69,20 @@ const Index = () => {
           title: "Musiques ajoutées",
           description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} ajoutée${newSongs.length !== 1 ? 's' : ''} à "${collection?.name}".`,
         });
-      } else {
+      } else if (newSongs.length > 0) {
         toast({
           title: "Musiques importées",
           description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} importée${newSongs.length !== 1 ? 's' : ''} avec succès.`,
         });
+      } else {
+        toast({
+          title: "Aucune musique importée",
+          description: "Vérifiez que les fichiers sont des fichiers MP3 valides.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
+      console.error('Error during file upload:', error);
       toast({
         title: "Erreur d'importation",
         description: "Une erreur s'est produite lors de l'importation des fichiers.",
