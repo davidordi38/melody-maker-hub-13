@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
-import { Music2, Play, Upload } from 'lucide-react';
+import { Music2, Play, Upload, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { useCollections } from '@/hooks/useCollections';
+import { useSupabaseMusicPlayer } from '@/hooks/useSupabaseMusicPlayer';
+import { useSupabaseCollections } from '@/hooks/useSupabaseCollections';
+import { useAuth } from '@/hooks/useAuth';
+import { AuthModal } from '@/components/AuthModal';
 import { SearchBar } from '@/components/SearchBar';
 import { SongCard } from '@/components/SongCard';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { CollectionManager } from '@/components/CollectionManager';
 import { PlaylistManager } from '@/components/PlaylistManager';
-import { Song, Playlist } from '@/types/music';
-import { MusicCollection } from '@/types/collection';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
+  const { user, profile, loading, signOut, isAuthenticated } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
   const {
     songs,
-    playlists,
     playerState,
     addSongs,
     playSong,
@@ -23,12 +25,9 @@ const Index = () => {
     playNext,
     playPrevious,
     playAllSongs,
-    playPlaylist,
-    createPlaylist,
-    deletePlaylist,
-    addSongToPlaylist,
-    getPlaylistSongs,
-  } = useMusicPlayer();
+    isUploading,
+    deleteSong,
+  } = useSupabaseMusicPlayer();
 
   const {
     collections,
@@ -36,118 +35,55 @@ const Index = () => {
     deleteCollection,
     addSongsToCollection,
     getCollectionSongs,
-  } = useCollections();
+  } = useSupabaseCollections();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollection, setSelectedCollection] = useState<MusicCollection | null>(null);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
-  const [currentView, setCurrentView] = useState<'all' | 'collections' | 'playlists'>('all');
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadingToCollection, setUploadingToCollection] = useState<string | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<any>(null);
+  const [currentView, setCurrentView] = useState<'all' | 'collections'>('all');
   const { toast } = useToast();
 
-  const handleFilesSelected = async (files: FileList, collectionId?: string) => {
-    const isUploadingToSpecificCollection = !!collectionId;
-    
-    if (isUploadingToSpecificCollection) {
-      setUploadingToCollection(collectionId);
-    } else {
-      setIsUploading(true);
-    }
-    
-    try {
-      console.log('Starting upload of', files.length, 'files');
-      const newSongs = await addSongs(files);
-      console.log('Upload completed, received', newSongs.length, 'songs');
-      
-      if (collectionId && newSongs.length > 0) {
-        const songIds = newSongs.map(song => song.id);
-        addSongsToCollection(songIds, collectionId);
-        const collection = collections.find(c => c.id === collectionId);
-        toast({
-          title: "Musiques ajoutées",
-          description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} ajoutée${newSongs.length !== 1 ? 's' : ''} à "${collection?.name}".`,
-        });
-      } else if (newSongs.length > 0) {
-        toast({
-          title: "Musiques importées",
-          description: `${newSongs.length} chanson${newSongs.length !== 1 ? 's' : ''} importée${newSongs.length !== 1 ? 's' : ''} avec succès.`,
-        });
-      } else {
-        toast({
-          title: "Aucune musique importée",
-          description: "Vérifiez que les fichiers sont des fichiers MP3 valides.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error during file upload:', error);
-      toast({
-        title: "Erreur d'importation",
-        description: "Une erreur s'est produite lors de l'importation des fichiers.",
-        variant: "destructive",
-      });
-    } finally {
-      if (isUploadingToSpecificCollection) {
-        setUploadingToCollection(null);
-      } else {
-        setIsUploading(false);
-      }
-    }
-  };
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white text-xl">Chargement...</div>
+      </div>
+    );
+  }
 
-  const handleSongPlay = (song: Song) => {
-    let currentSongs = songs;
-    
-    if (selectedCollection) {
-      currentSongs = getCollectionSongs(selectedCollection, songs);
-    } else if (selectedPlaylist) {
-      currentSongs = getPlaylistSongs(selectedPlaylist);
+  // Show auth modal if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center text-white">
+          <Music2 className="h-24 w-24 mx-auto mb-6 text-white/80" />
+          <h1 className="text-4xl font-bold mb-4">Bibliothèque Musicale Partagée</h1>
+          <p className="text-xl mb-8 text-white/80">
+            Connectez-vous pour accéder à votre bibliothèque musicale synchronisée
+          </p>
+          <Button onClick={() => setShowAuthModal(true)} size="lg">
+            Se connecter
+          </Button>
+        </div>
+        <AuthModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </div>
+    );
+  }
+
+  const handleFilesSelected = async (files: FileList) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
     }
-    
-    if (playerState.currentSong?.id === song.id) {
-      togglePlayPause();
-    } else {
-      playSong(song, currentSongs);
-    }
-  };
-
-  const handleAddToPlaylist = (songId: string, playlistId: string) => {
-    addSongToPlaylist(songId, playlistId);
-    const playlist = playlists.find(p => p.id === playlistId);
-    toast({
-      title: "Chanson ajoutée",
-      description: `Chanson ajoutée à la playlist "${playlist?.name}".`,
-    });
-  };
-
-  const handlePlayCollection = (collection: MusicCollection) => {
-    const collectionSongs = getCollectionSongs(collection, songs);
-    if (collectionSongs.length > 0) {
-      playSong(collectionSongs[0], collectionSongs);
-    }
-  };
-
-  const handlePlayAllSongs = () => {
-    if (songs.length === 0) return;
-    playSong(songs[0], songs);
-  };
-
-  const handleUploadToCollection = (collection: MusicCollection) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = '.mp3,audio/mpeg,audio/mp3';
-    input.onchange = (e) => {
-      const files = (e.target as HTMLInputElement).files;
-      if (files) {
-        handleFilesSelected(files, collection.id);
-      }
-    };
-    input.click();
+    await addSongs(files);
   };
 
   const handleGeneralUpload = () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
@@ -165,9 +101,9 @@ const Index = () => {
     let currentSongs = songs;
     
     if (selectedCollection) {
-      currentSongs = getCollectionSongs(selectedCollection, songs);
-    } else if (selectedPlaylist) {
-      currentSongs = getPlaylistSongs(selectedPlaylist);
+      // For Supabase collections, we need to get songs differently
+      // For now, just use all songs - we'll implement collection filtering later
+      currentSongs = songs;
     }
     
     if (!searchQuery) return currentSongs;
@@ -180,50 +116,80 @@ const Index = () => {
 
   const getCurrentViewTitle = () => {
     if (selectedCollection) return selectedCollection.name;
-    if (selectedPlaylist) return selectedPlaylist.name;
     return 'Toutes les musiques';
   };
 
-  const handleViewChange = (view: 'all' | 'collections' | 'playlists') => {
+  const handleViewChange = (view: 'all' | 'collections') => {
     setCurrentView(view);
     setSelectedCollection(null);
-    setSelectedPlaylist(null);
   };
 
-  const getSongCount = (collection: MusicCollection) => {
-    return getCollectionSongs(collection, songs).length;
+  const handlePlaySong = (song: any) => {
+    playSong(song, filteredSongs());
+  };
+
+  const handleCollectionUpload = async (collectionId: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.mp3,audio/mpeg,audio/mp3';
+    input.onchange = async (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        const newSongs = await addSongs(files);
+        const songIds = newSongs.map(song => song.id);
+        addSongsToCollection(songIds, collectionId);
+      }
+    };
+    input.click();
+  };
+
+  const handleCreateCollection = async (name: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    await createCollection(name);
   };
 
   const displayedSongs = filteredSongs();
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      {/* Header */}
-      <header className="border-b border-border bg-music-surface/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-screen-xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Music2 className="h-8 w-8 text-primary" />
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header with user info */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+            <Music2 className="h-8 w-8" />
+            Ma Bibliothèque Musicale
+          </h1>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-white">
+              <User className="h-5 w-5" />
+              <span>{profile?.username || user?.email}</span>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">MyMusic</h1>
-              <p className="text-muted-foreground">Votre bibliothèque musicale personnelle</p>
-            </div>
+            <Button variant="outline" onClick={() => signOut()} className="text-white border-white hover:bg-white/10">
+              <LogOut className="h-4 w-4 mr-2" />
+              Déconnexion
+            </Button>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-screen-xl mx-auto px-6 py-8">
-        {/* Upload Section */}
-        {songs.length === 0 && (
-          <div className="mb-8 text-center">
-            <div className="max-w-md mx-auto">
-              <Music2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-foreground mb-2">
-                Bienvenue dans MyMusic
+        {/* Empty State */}
+        {songs.length === 0 && currentView === 'all' && (
+          <div className="text-center py-16">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md mx-auto">
+              <Music2 className="h-16 w-16 text-white/60 mx-auto mb-4" />
+              <h2 className="text-2xl font-semibold text-white mb-4">
+                Votre bibliothèque partagée est vide
               </h2>
               <p className="text-muted-foreground mb-6">
-                Commencez par importer vos premières musiques pour créer votre bibliothèque personnelle.
+                Commencez par importer vos premières musiques. Elles seront automatiquement synchronisées avec vos amis !
               </p>
               <button
                 onClick={handleGeneralUpload}
@@ -254,52 +220,37 @@ const Index = () => {
                 <Button
                   variant={currentView === 'all' ? 'default' : 'outline'}
                   onClick={() => handleViewChange('all')}
+                  className="text-white border-white"
                 >
                   Toutes les musiques ({songs.length})
                 </Button>
                 <Button
                   variant={currentView === 'collections' ? 'default' : 'outline'}
                   onClick={() => handleViewChange('collections')}
+                  className="text-white border-white"
                 >
                   Collections ({collections.length})
-                </Button>
-                <Button
-                  variant={currentView === 'playlists' ? 'default' : 'outline'}
-                  onClick={() => handleViewChange('playlists')}
-                >
-                  Playlists ({playlists.length})
                 </Button>
               </div>
 
               {/* Collection Manager */}
               {currentView === 'collections' && (
                 <CollectionManager
-                  collections={collections}
+                  collections={collections.map(c => ({
+                    ...c,
+                    songIds: [],
+                    createdAt: new Date(c.created_at)
+                  }))}
                   selectedCollection={selectedCollection}
-                  onCreateCollection={createCollection}
+                  onCreateCollection={handleCreateCollection}
                   onSelectCollection={(collection) => {
                     setSelectedCollection(collection);
-                    setSelectedPlaylist(null);
                   }}
                   onDeleteCollection={deleteCollection}
-                  onPlayCollection={handlePlayCollection}
-                  onUploadToCollection={handleUploadToCollection}
-                  getSongCount={getSongCount}
+                  onPlayCollection={() => {}}
+                  onUploadToCollection={(collection) => handleCollectionUpload(collection.id)}
+                  getSongCount={() => 0}
                   totalSongs={songs.length}
-                />
-              )}
-
-              {/* Playlist Manager */}
-              {currentView === 'playlists' && (
-                <PlaylistManager
-                  playlists={playlists}
-                  onCreatePlaylist={createPlaylist}
-                  onDeletePlaylist={deletePlaylist}
-                  onSelectPlaylist={(playlist) => {
-                    setSelectedPlaylist(playlist);
-                    setSelectedCollection(null);
-                  }}
-                  selectedPlaylist={selectedPlaylist}
                 />
               )}
             </div>
@@ -313,53 +264,43 @@ const Index = () => {
                   placeholder={`Rechercher dans ${getCurrentViewTitle()}...`}
                 />
               </div>
-              {currentView !== 'playlists' && (
-                <button
-                  onClick={handleGeneralUpload}
-                  disabled={isUploading}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
-                >
-                  {isUploading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      Ajout...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4" />
-                      Ajouter des musiques
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                onClick={handleGeneralUpload}
+                disabled={isUploading}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Ajout...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Ajouter des musiques
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Current View Title */}
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-foreground">
+                <h2 className="text-2xl font-bold text-white">
                   {getCurrentViewTitle()}
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-white/70">
                   {displayedSongs.length} chanson{displayedSongs.length !== 1 ? 's' : ''}
                   {searchQuery && ` • Recherche: "${searchQuery}"`}
                 </p>
               </div>
-              {displayedSongs.length > 0 && (currentView === 'all' || selectedCollection || selectedPlaylist) && (
+              {displayedSongs.length > 0 && (
                 <Button
-                  onClick={() => {
-                    if (selectedCollection) {
-                      handlePlayCollection(selectedCollection);
-                    } else if (selectedPlaylist) {
-                      playPlaylist(selectedPlaylist);
-                    } else {
-                      handlePlayAllSongs();
-                    }
-                  }}
+                  onClick={playAllSongs}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  Lancer {selectedCollection ? 'la collection' : selectedPlaylist ? 'la playlist' : 'toutes les musiques'}
+                  Lancer toutes les musiques
                 </Button>
               )}
             </div>
@@ -370,26 +311,27 @@ const Index = () => {
                 displayedSongs.map(song => (
                   <SongCard
                     key={song.id}
-                    song={song}
-                    isPlaying={playerState.isPlaying}
-                    isCurrentSong={playerState.currentSong?.id === song.id}
-                    onPlay={() => handleSongPlay(song)}
-                    onAddToPlaylist={(playlistId) => handleAddToPlaylist(song.id, playlistId)}
-                    playlists={playlists}
+                    song={{
+                      id: song.id,
+                      title: song.title,
+                      artist: song.artist || 'Artiste inconnu',
+                      duration: song.duration,
+                    }}
+                    isPlaying={playerState.currentSong?.id === song.id && playerState.isPlaying}
+                    onPlay={() => handlePlaySong(song)}
+                    onDelete={user?.id === song.uploaded_by ? () => deleteSong(song.id) : undefined}
                   />
                 ))
               ) : (
                 <div className="text-center py-12">
-                  <Music2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">
-                    {searchQuery ? 'Aucune chanson trouvée' : selectedCollection ? 'Aucune chanson dans cette collection' : 'Aucune chanson'}
+                  <Music2 className="h-12 w-12 text-white/60 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-white mb-2">
+                    {searchQuery ? 'Aucune chanson trouvée' : 'Aucune chanson'}
                   </h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-white/70">
                     {searchQuery 
                       ? 'Essayez de modifier votre recherche' 
-                      : selectedCollection 
-                        ? 'Utilisez le bouton "Upload" sur la collection pour ajouter des musiques' 
-                        : 'Importez vos premières musiques'
+                      : 'Importez vos premières musiques'
                     }
                   </p>
                 </div>
@@ -408,6 +350,8 @@ const Index = () => {
         onPrevious={playPrevious}
         queue={playerState.queue}
       />
+      
+      <AuthModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };
