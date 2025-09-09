@@ -11,6 +11,7 @@ import { MusicPlayer } from '@/components/MusicPlayer';
 import { CollectionManager } from '@/components/CollectionManager';
 import { PlaylistManager } from '@/components/PlaylistManager';
 import { useToast } from '@/hooks/use-toast';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 const Index = () => {
   const { user, profile, loading, signOut, isAuthenticated } = useAuth();
@@ -42,23 +43,34 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'all' | 'collections'>('all');
   const { toast } = useToast();
 
+  // Show connection status if Supabase not configured
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      toast({
+        title: "Configuration Supabase manquante",
+        description: "Connectez votre projet à Supabase pour utiliser toutes les fonctionnalités",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   // Show loading while checking auth
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Chargement...</div>
+        <div className="text-foreground text-xl">Chargement...</div>
       </div>
     );
   }
 
-  // Show auth modal if not authenticated
-  if (!isAuthenticated) {
+  // Show auth modal if not authenticated and Supabase is configured
+  if (!isAuthenticated && isSupabaseConfigured()) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-center text-white">
-          <Music2 className="h-24 w-24 mx-auto mb-6 text-white/80" />
+        <div className="text-center text-foreground">
+          <Music2 className="h-24 w-24 mx-auto mb-6 text-foreground/80" />
           <h1 className="text-4xl font-bold mb-4">Bibliothèque Musicale Partagée</h1>
-          <p className="text-xl mb-8 text-white/80">
+          <p className="text-xl mb-8 text-foreground/80">
             Connectez-vous pour accéder à votre bibliothèque musicale synchronisée
           </p>
           <Button onClick={() => setShowAuthModal(true)} size="lg">
@@ -66,6 +78,32 @@ const Index = () => {
           </Button>
         </div>
         <AuthModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </div>
+    );
+  }
+
+  // Show demo mode if Supabase not configured
+  if (!isSupabaseConfigured()) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center text-foreground max-w-2xl mx-auto p-8">
+          <Music2 className="h-24 w-24 mx-auto mb-6 text-foreground/80" />
+          <h1 className="text-4xl font-bold mb-4">Bibliothèque Musicale Partagée</h1>
+          <div className="bg-card/50 backdrop-blur-sm rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 text-foreground">Configuration requise</h2>
+            <p className="text-muted-foreground mb-4">
+              Pour utiliser cette application, vous devez connecter votre projet à Supabase.
+            </p>
+            <div className="space-y-2 text-left text-sm text-muted-foreground">
+              <p>• Cliquez sur le bouton Supabase vert en haut à droite</p>
+              <p>• Connectez votre projet Supabase</p>
+              <p>• L'application se rechargera automatiquement</p>
+            </div>
+          </div>
+          <p className="text-muted-foreground">
+            Une fois configuré, vous pourrez uploader et partager vos musiques avec vos amis !
+          </p>
+        </div>
       </div>
     );
   }
@@ -164,16 +202,16 @@ const Index = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Header with user info */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <Music2 className="h-8 w-8" />
             Ma Bibliothèque Musicale
           </h1>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-white">
+            <div className="flex items-center gap-2 text-foreground">
               <User className="h-5 w-5" />
               <span>{profile?.username || user?.email}</span>
             </div>
-            <Button variant="outline" onClick={() => signOut()} className="text-white border-white hover:bg-white/10">
+            <Button variant="outline" onClick={() => signOut()} className="text-foreground border-foreground hover:bg-foreground/10">
               <LogOut className="h-4 w-4 mr-2" />
               Déconnexion
             </Button>
@@ -183,9 +221,9 @@ const Index = () => {
         {/* Empty State */}
         {songs.length === 0 && currentView === 'all' && (
           <div className="text-center py-16">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md mx-auto">
-              <Music2 className="h-16 w-16 text-white/60 mx-auto mb-4" />
-              <h2 className="text-2xl font-semibold text-white mb-4">
+            <div className="bg-card/10 backdrop-blur-sm rounded-xl p-8 max-w-md mx-auto">
+              <Music2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h2 className="text-2xl font-semibold text-foreground mb-4">
                 Votre bibliothèque partagée est vide
               </h2>
               <p className="text-muted-foreground mb-6">
@@ -220,14 +258,14 @@ const Index = () => {
                 <Button
                   variant={currentView === 'all' ? 'default' : 'outline'}
                   onClick={() => handleViewChange('all')}
-                  className="text-white border-white"
+                  className="text-foreground border-foreground"
                 >
                   Toutes les musiques ({songs.length})
                 </Button>
                 <Button
                   variant={currentView === 'collections' ? 'default' : 'outline'}
                   onClick={() => handleViewChange('collections')}
-                  className="text-white border-white"
+                  className="text-foreground border-foreground"
                 >
                   Collections ({collections.length})
                 </Button>
@@ -249,6 +287,7 @@ const Index = () => {
                   onDeleteCollection={deleteCollection}
                   onPlayCollection={() => {}}
                   onUploadToCollection={(collection) => handleCollectionUpload(collection.id)}
+                  getSongCount={(collectionId) => 0}
                   totalSongs={songs.length}
                 />
               )}
@@ -285,10 +324,10 @@ const Index = () => {
             {/* Current View Title */}
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-bold text-foreground">
                   {getCurrentViewTitle()}
                 </h2>
-                <p className="text-white/70">
+                <p className="text-muted-foreground">
                   {displayedSongs.length} chanson{displayedSongs.length !== 1 ? 's' : ''}
                   {searchQuery && ` • Recherche: "${searchQuery}"`}
                 </p>
@@ -323,11 +362,11 @@ const Index = () => {
                 ))
               ) : (
                 <div className="text-center py-12">
-                  <Music2 className="h-12 w-12 text-white/60 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-white mb-2">
+                  <Music2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">
                     {searchQuery ? 'Aucune chanson trouvée' : 'Aucune chanson'}
                   </h3>
-                  <p className="text-white/70">
+                  <p className="text-muted-foreground">
                     {searchQuery 
                       ? 'Essayez de modifier votre recherche' 
                       : 'Importez vos premières musiques'
@@ -349,7 +388,6 @@ const Index = () => {
         onPrevious={playPrevious}
         queue={playerState.queue}
       />
-      
     </div>
   );
 };

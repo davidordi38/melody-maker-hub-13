@@ -25,7 +25,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
 }) => {
   return (
     <Card
-      className={`p-5 cursor-pointer transition-all duration-300 hover:bg-music-surface-hover border-2 ${
+      className={`p-5 cursor-pointer transition-all duration-300 hover:bg-muted/50 border-2 ${
         isSelected ? 'border-primary bg-primary/5 shadow-md' : 'border-border'
       }`}
       onClick={onSelect}

@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { MusicCollection } from '@/types/collection';
 import { CollectionCard } from './CollectionCard';
-import { useCollectionSongCount } from '@/hooks/useCollectionSongCount';
 
 interface CollectionManagerProps {
   collections: MusicCollection[];
@@ -16,32 +15,9 @@ interface CollectionManagerProps {
   onDeleteCollection: (id: string) => void;
   onPlayCollection: (collection: MusicCollection) => void;
   onUploadToCollection: (collection: MusicCollection) => void;
+  getSongCount: (collectionId: string) => number;
   totalSongs: number;
 }
-
-// Component for individual collection to use the hook properly
-const CollectionWithCount: React.FC<{
-  collection: MusicCollection;
-  selectedCollection: MusicCollection | null;
-  onSelect: () => void;
-  onPlay: () => void;
-  onUpload: () => void;
-  onDelete: () => void;
-}> = ({ collection, selectedCollection, onSelect, onPlay, onUpload, onDelete }) => {
-  const songCount = useCollectionSongCount(collection.id);
-  
-  return (
-    <CollectionCard
-      collection={collection}
-      songCount={songCount}
-      isSelected={selectedCollection?.id === collection.id}
-      onSelect={onSelect}
-      onPlay={onPlay}
-      onUpload={onUpload}
-      onDelete={onDelete}
-    />
-  );
-};
 
 export const CollectionManager: React.FC<CollectionManagerProps> = ({
   collections,
@@ -51,6 +27,7 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
   onDeleteCollection,
   onPlayCollection,
   onUploadToCollection,
+  getSongCount,
   totalSongs
 }) => {
   const [newCollectionName, setNewCollectionName] = useState('');
@@ -102,7 +79,7 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Toutes les musiques */}
         <Card
-          className={`p-4 cursor-pointer transition-all duration-300 hover:bg-music-surface-hover ${
+          className={`p-4 cursor-pointer transition-all duration-300 hover:bg-muted/50 ${
             !selectedCollection ? 'ring-2 ring-primary' : ''
           }`}
           onClick={() => onSelectCollection(null)}
@@ -122,10 +99,11 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
 
         {/* Collections */}
         {collections.map(collection => (
-          <CollectionWithCount
+          <CollectionCard
             key={collection.id}
             collection={collection}
-            selectedCollection={selectedCollection}
+            songCount={getSongCount(collection.id)}
+            isSelected={selectedCollection?.id === collection.id}
             onSelect={() => onSelectCollection(collection)}
             onPlay={() => onPlayCollection(collection)}
             onUpload={() => onUploadToCollection(collection)}
