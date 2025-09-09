@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { MusicCollection } from '@/types/collection';
 import { CollectionCard } from './CollectionCard';
+import { useCollectionSongCount } from '@/hooks/useCollectionSongCount';
 
 interface CollectionManagerProps {
   collections: MusicCollection[];
@@ -15,9 +16,32 @@ interface CollectionManagerProps {
   onDeleteCollection: (id: string) => void;
   onPlayCollection: (collection: MusicCollection) => void;
   onUploadToCollection: (collection: MusicCollection) => void;
-  getSongCount: (collection: MusicCollection) => number;
   totalSongs: number;
 }
+
+// Component for individual collection to use the hook properly
+const CollectionWithCount: React.FC<{
+  collection: MusicCollection;
+  selectedCollection: MusicCollection | null;
+  onSelect: () => void;
+  onPlay: () => void;
+  onUpload: () => void;
+  onDelete: () => void;
+}> = ({ collection, selectedCollection, onSelect, onPlay, onUpload, onDelete }) => {
+  const songCount = useCollectionSongCount(collection.id);
+  
+  return (
+    <CollectionCard
+      collection={collection}
+      songCount={songCount}
+      isSelected={selectedCollection?.id === collection.id}
+      onSelect={onSelect}
+      onPlay={onPlay}
+      onUpload={onUpload}
+      onDelete={onDelete}
+    />
+  );
+};
 
 export const CollectionManager: React.FC<CollectionManagerProps> = ({
   collections,
@@ -27,7 +51,6 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
   onDeleteCollection,
   onPlayCollection,
   onUploadToCollection,
-  getSongCount,
   totalSongs
 }) => {
   const [newCollectionName, setNewCollectionName] = useState('');
@@ -99,11 +122,10 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
 
         {/* Collections */}
         {collections.map(collection => (
-          <CollectionCard
+          <CollectionWithCount
             key={collection.id}
             collection={collection}
-            songCount={getSongCount(collection)}
-            isSelected={selectedCollection?.id === collection.id}
+            selectedCollection={selectedCollection}
             onSelect={() => onSelectCollection(collection)}
             onPlay={() => onPlayCollection(collection)}
             onUpload={() => onUploadToCollection(collection)}

@@ -11,7 +11,6 @@ import { MusicPlayer } from '@/components/MusicPlayer';
 import { CollectionManager } from '@/components/CollectionManager';
 import { PlaylistManager } from '@/components/PlaylistManager';
 import { useToast } from '@/hooks/use-toast';
-import { useCollectionSongCount } from '@/hooks/useCollectionSongCount';
 
 const Index = () => {
   const { user, profile, loading, signOut, isAuthenticated } = useAuth();
@@ -250,10 +249,6 @@ const Index = () => {
                   onDeleteCollection={deleteCollection}
                   onPlayCollection={() => {}}
                   onUploadToCollection={(collection) => handleCollectionUpload(collection.id)}
-                  getSongCount={(collection) => {
-                    const songCount = useCollectionSongCount(collection.id);
-                    return songCount;
-                  }}
                   totalSongs={songs.length}
                 />
               )}
