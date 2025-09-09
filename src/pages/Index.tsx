@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Music2, Play, Upload, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSupabaseMusicPlayer } from '@/hooks/useSupabaseMusicPlayer';
@@ -11,6 +11,7 @@ import { MusicPlayer } from '@/components/MusicPlayer';
 import { CollectionManager } from '@/components/CollectionManager';
 import { PlaylistManager } from '@/components/PlaylistManager';
 import { useToast } from '@/hooks/use-toast';
+import { useCollectionSongCount } from '@/hooks/useCollectionSongCount';
 
 const Index = () => {
   const { user, profile, loading, signOut, isAuthenticated } = useAuth();
@@ -249,7 +250,10 @@ const Index = () => {
                   onDeleteCollection={deleteCollection}
                   onPlayCollection={() => {}}
                   onUploadToCollection={(collection) => handleCollectionUpload(collection.id)}
-                  getSongCount={() => 0}
+                  getSongCount={(collection) => {
+                    const songCount = useCollectionSongCount(collection.id);
+                    return songCount;
+                  }}
                   totalSongs={songs.length}
                 />
               )}
@@ -351,7 +355,6 @@ const Index = () => {
         queue={playerState.queue}
       />
       
-      <AuthModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };

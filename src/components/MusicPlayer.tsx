@@ -25,36 +25,46 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(50);
 
+  // Single useEffect to handle both song changes and play/pause state
   useEffect(() => {
-    if (audioRef.current && currentSong) {
-      audioRef.current.src = currentSong.url;
-      audioRef.current.load();
-      // Si la musique doit être en cours de lecture, la démarrer après le chargement
-      if (isPlaying) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.log("Erreur de lecture automatique:", error);
-          });
+    if (!audioRef.current || !currentSong) return;
+
+    const audio = audioRef.current;
+    
+    // If the song has changed, load it
+    if (audio.src !== currentSong.url) {
+      audio.src = currentSong.url;
+      audio.load();
+      
+      // Wait for loadeddata before attempting to play
+      const handleCanPlay = () => {
+        if (isPlaying) {
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.log("Erreur de lecture:", error);
+            });
+          }
         }
+        audio.removeEventListener('canplay', handleCanPlay);
+      };
+      
+      audio.addEventListener('canplay', handleCanPlay);
+      return;
+    }
+
+    // Handle play/pause for current song
+    if (isPlaying && audio.paused) {
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log("Erreur de lecture:", error);
+        });
       }
+    } else if (!isPlaying && !audio.paused) {
+      audio.pause();
     }
   }, [currentSong, isPlaying]);
-
-  useEffect(() => {
-    if (audioRef.current && currentSong) {
-      if (isPlaying) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.log("Erreur de lecture:", error);
-          });
-        }
-      } else {
-        audioRef.current.pause();
-      }
-    }
-  }, [isPlaying, currentSong]);
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
