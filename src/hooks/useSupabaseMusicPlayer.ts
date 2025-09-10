@@ -1,12 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, Song as SupabaseSong } from '@/lib/supabase';
-import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 
-// Local interface that includes the File object for playback
-export interface LocalSong extends SupabaseSong {
-  file?: File;
-  url: string; // This will be the Supabase Storage URL or blob URL
+export interface LocalSong {
+  id: string;
+  title: string;
+  artist?: string;
+  duration: number;
+  file_path?: string;
+  url: string;
+  uploaded_by?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MusicPlayerState {
@@ -30,39 +36,8 @@ export const useSupabaseMusicPlayer = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Load songs from Supabase on mount and when user changes
-  useEffect(() => {
-    if (user) {
-      loadSongs();
-    }
-  }, [user]);
-
-  // Setup real-time subscription for songs
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('songs-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'songs' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            loadSongs(); // Reload to get the new song with URL
-          } else if (payload.eventType === 'DELETE') {
-            setSongs(prev => prev.filter(song => song.id !== payload.old.id));
-          } else if (payload.eventType === 'UPDATE') {
-            loadSongs(); // Reload to get updated data
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
-
-  const loadSongs = async () => {
+  // Load songs from Supabase
+  const loadSongs = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('songs')
@@ -71,27 +46,25 @@ export const useSupabaseMusicPlayer = () => {
 
       if (error) throw error;
 
-      // Convert Supabase songs to LocalSongs with URLs
-      const localSongs: LocalSong[] = await Promise.all(
-        data.map(async (song) => {
-          let url = song.file_url;
+      const songsWithUrls = await Promise.all(
+        (data || []).map(async (song) => {
+          if (song.file_url) {
+            return { ...song, url: song.file_url };
+          }
           
-          // If no file_url, try to get it from storage
-          if (!url && song.file_path) {
+          if (song.file_path) {
             const { data: urlData } = supabase.storage
               .from('music-files')
               .getPublicUrl(song.file_path);
-            url = urlData.publicUrl;
+            
+            return { ...song, url: urlData.publicUrl };
           }
 
-          return {
-            ...song,
-            url: url || '',
-          };
+          return { ...song, url: '' };
         })
       );
 
-      setSongs(localSongs);
+      setSongs(songsWithUrls);
     } catch (error) {
       console.error('Error loading songs:', error);
       toast({
@@ -100,121 +73,152 @@ export const useSupabaseMusicPlayer = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const addSongs = async (files: FileList): Promise<LocalSong[]> => {
+  // Set up real-time subscription
+  useEffect(() => {
+    loadSongs();
+
+    const channel = supabase
+      .channel('songs-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'songs'
+      }, () => {
+        loadSongs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadSongs]);
+
+  // Upload songs to Supabase
+  const addSongs = useCallback(async (files: FileList): Promise<LocalSong[]> => {
     if (!user) {
       toast({
-        title: "Connexion requise",
-        description: "Vous devez être connecté pour ajouter des musiques",
+        title: "Authentification requise",
+        description: "Vous devez être connecté pour uploader des musiques",
         variant: "destructive",
       });
       return [];
     }
 
     setIsUploading(true);
-    const newSongs: LocalSong[] = [];
+    const uploadedSongs: LocalSong[] = [];
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        try {
-          // Create a unique file path
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${user.id}/${Date.now()}-${file.name}`;
-          
-          // Upload file to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('music-files')
-            .upload(fileName, file);
-
-          if (uploadError) throw uploadError;
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('music-files')
-            .getPublicUrl(fileName);
-
-          // Get audio metadata
-          const duration = await getAudioDuration(file);
-          const audioMetadata = await getAudioMetadata(file);
-
-          // Insert song record in database
-          const { data: songData, error: dbError } = await supabase
-            .from('songs')
-            .insert({
-              title: audioMetadata.title || file.name.replace(/\.[^/.]+$/, ""),
-              artist: audioMetadata.artist,
-              duration: duration,
-              file_path: fileName,
-              file_url: urlData.publicUrl,
-              uploaded_by: user.id,
-            })
-            .select()
-            .single();
-
-          if (dbError) throw dbError;
-
-          const localSong: LocalSong = {
-            ...songData,
-            file,
-            url: urlData.publicUrl,
-          };
-
-          newSongs.push(localSong);
-
-        } catch (error) {
-          console.error(`Error processing file ${file.name}:`, error);
+      for (const file of Array.from(files)) {
+        if (!file.name.toLowerCase().endsWith('.mp3')) {
           toast({
-            title: "Erreur d'upload",
-            description: `Impossible d'ajouter ${file.name}`,
+            title: "Format non supporté",
+            description: `${file.name} n'est pas un fichier MP3`,
             variant: "destructive",
+          });
+          continue;
+        }
+
+        // Generate unique filename
+        const fileExt = 'mp3';
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('music-files')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('music-files')
+          .getPublicUrl(fileName);
+
+        // Extract metadata
+        const duration = await getAudioDuration(file);
+        const { title, artist } = await getAudioMetadata(file);
+
+        // Insert song record
+        const { data: insertData, error: insertError } = await supabase
+          .from('songs')
+          .insert({
+            title: title || file.name.replace('.mp3', ''),
+            artist,
+            duration,
+            file_path: fileName,
+            file_url: urlData.publicUrl,
+            uploaded_by: user.id,
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        if (insertData) {
+          uploadedSongs.push({
+            ...insertData,
+            url: urlData.publicUrl,
           });
         }
       }
 
-      if (newSongs.length > 0) {
-        toast({
-          title: "Musiques ajoutées",
-          description: `${newSongs.length} musique(s) ajoutée(s) avec succès`,
-        });
-      }
+      toast({
+        title: "Succès",
+        description: `${uploadedSongs.length} musique(s) uploadée(s) avec succès`,
+      });
 
+      return uploadedSongs;
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Erreur d'upload",
+        description: "Impossible d'uploader les musiques",
+        variant: "destructive",
+      });
+      return [];
     } finally {
       setIsUploading(false);
     }
+  }, [user, toast]);
 
-    return newSongs;
-  };
-
+  // Helper functions
   const getAudioDuration = (file: File): Promise<number> => {
     return new Promise((resolve) => {
       const audio = new Audio();
-      audio.onloadedmetadata = () => {
-        resolve(audio.duration || 0);
-      };
-      audio.onerror = () => resolve(0);
+      audio.addEventListener('loadedmetadata', () => {
+        resolve(Math.round(audio.duration));
+      });
+      audio.addEventListener('error', () => {
+        resolve(0);
+      });
       audio.src = URL.createObjectURL(file);
     });
   };
 
   const getAudioMetadata = (file: File): Promise<{ title?: string; artist?: string }> => {
     return new Promise((resolve) => {
-      // For now, just extract from filename
-      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-      const parts = nameWithoutExt.split(' - ');
+      const fileName = file.name.replace('.mp3', '');
+      const parts = fileName.split(' - ');
       
       if (parts.length >= 2) {
-        resolve({ artist: parts[0].trim(), title: parts[1].trim() });
+        resolve({
+          artist: parts[0].trim(),
+          title: parts[1].trim(),
+        });
       } else {
-        resolve({ title: nameWithoutExt });
+        resolve({
+          title: fileName,
+        });
       }
     });
   };
 
+  // Playback controls
   const playSong = useCallback((song: LocalSong, queue?: LocalSong[]) => {
-    const newQueue = queue || [song];
+    const newQueue = queue || songs;
     const index = newQueue.findIndex(s => s.id === song.id);
     
     setPlayerState({
@@ -222,9 +226,9 @@ export const useSupabaseMusicPlayer = () => {
       isPlaying: true,
       currentTime: 0,
       queue: newQueue,
-      currentIndex: index >= 0 ? index : 0,
+      currentIndex: index,
     });
-  }, []);
+  }, [songs]);
 
   const togglePlayPause = useCallback(() => {
     setPlayerState(prev => ({
@@ -235,8 +239,8 @@ export const useSupabaseMusicPlayer = () => {
 
   const playNext = useCallback(() => {
     setPlayerState(prev => {
-      if (prev.currentIndex < prev.queue.length - 1) {
-        const nextIndex = prev.currentIndex + 1;
+      const nextIndex = prev.currentIndex + 1;
+      if (nextIndex < prev.queue.length) {
         return {
           ...prev,
           currentSong: prev.queue[nextIndex],
@@ -250,8 +254,8 @@ export const useSupabaseMusicPlayer = () => {
 
   const playPrevious = useCallback(() => {
     setPlayerState(prev => {
-      if (prev.currentIndex > 0) {
-        const prevIndex = prev.currentIndex - 1;
+      const prevIndex = prev.currentIndex - 1;
+      if (prevIndex >= 0) {
         return {
           ...prev,
           currentSong: prev.queue[prevIndex],
@@ -269,15 +273,25 @@ export const useSupabaseMusicPlayer = () => {
     }
   }, [songs, playSong]);
 
-  const deleteSong = async (songId: string) => {
+  // Delete song
+  const deleteSong = useCallback(async (songId: string) => {
     if (!user) return;
 
     try {
-      // Get song info first
       const song = songs.find(s => s.id === songId);
       if (!song) return;
 
-      // Delete from storage
+      // Check if user owns the song
+      if (song.uploaded_by !== user.id) {
+        toast({
+          title: "Non autorisé",
+          description: "Vous ne pouvez supprimer que vos propres musiques",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Delete from storage if file_path exists
       if (song.file_path) {
         await supabase.storage
           .from('music-files')
@@ -288,25 +302,24 @@ export const useSupabaseMusicPlayer = () => {
       const { error } = await supabase
         .from('songs')
         .delete()
-        .eq('id', songId)
-        .eq('uploaded_by', user.id); // Ensure user can only delete their own songs
+        .eq('id', songId);
 
       if (error) throw error;
 
       toast({
-        title: "Musique supprimée",
-        description: "La musique a été supprimée avec succès",
+        title: "Succès",
+        description: "Musique supprimée avec succès",
       });
 
     } catch (error) {
-      console.error('Error deleting song:', error);
+      console.error('Delete error:', error);
       toast({
         title: "Erreur",
         description: "Impossible de supprimer la musique",
         variant: "destructive",
       });
     }
-  };
+  }, [user, songs, toast]);
 
   return {
     songs,
@@ -319,6 +332,5 @@ export const useSupabaseMusicPlayer = () => {
     playPrevious,
     playAllSongs,
     deleteSong,
-    loadSongs,
   };
 };

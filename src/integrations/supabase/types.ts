@@ -14,7 +14,174 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      collection_songs: {
+        Row: {
+          added_at: string
+          collection_id: string
+          id: string
+          song_id: string
+        }
+        Insert: {
+          added_at?: string
+          collection_id: string
+          id?: string
+          song_id: string
+        }
+        Update: {
+          added_at?: string
+          collection_id?: string
+          id?: string
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_songs_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_songs_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      playlist_songs: {
+        Row: {
+          added_at: string
+          id: string
+          playlist_id: string
+          position: number
+          song_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          playlist_id: string
+          position?: number
+          song_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          playlist_id?: string
+          position?: number
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_songs_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_songs_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      songs: {
+        Row: {
+          artist: string | null
+          created_at: string
+          duration: number | null
+          file_path: string | null
+          file_url: string | null
+          id: string
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          artist?: string | null
+          created_at?: string
+          duration?: number | null
+          file_path?: string | null
+          file_url?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          artist?: string | null
+          created_at?: string
+          duration?: number | null
+          file_path?: string | null
+          file_url?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

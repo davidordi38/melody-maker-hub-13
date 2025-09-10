@@ -1,34 +1,46 @@
 import React, { useState } from 'react';
-import { Plus, Music } from 'lucide-react';
+import { Plus, Music, Play, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Playlist } from '@/types/music';
+import { PlaylistWithSongs } from '@/hooks/useSupabasePlaylists';
+import { LocalSong } from '@/hooks/useSupabaseMusicPlayer';
 
 interface PlaylistManagerProps {
-  playlists: Playlist[];
+  songs: LocalSong[];
+  playlists: PlaylistWithSongs[];
   onCreatePlaylist: (name: string) => void;
   onDeletePlaylist: (id: string) => void;
-  onSelectPlaylist: (playlist: Playlist | null) => void;
-  selectedPlaylist: Playlist | null;
+  onAddSongToPlaylist: (songId: string, playlistId: string) => void;
+  onRemoveSongFromPlaylist: (songId: string, playlistId: string) => void;
+  onPlaySong: (song: LocalSong, queue?: LocalSong[]) => void;
 }
 
 export const PlaylistManager: React.FC<PlaylistManagerProps> = ({
+  songs,
   playlists,
   onCreatePlaylist,
   onDeletePlaylist,
-  onSelectPlaylist,
-  selectedPlaylist
+  onAddSongToPlaylist,
+  onRemoveSongFromPlaylist,
+  onPlaySong,
 }) => {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistWithSongs | null>(null);
 
   const handleCreatePlaylist = () => {
     if (newPlaylistName.trim()) {
       onCreatePlaylist(newPlaylistName.trim());
       setNewPlaylistName('');
       setIsDialogOpen(false);
+    }
+  };
+
+  const handlePlayPlaylist = (playlist: PlaylistWithSongs) => {
+    if (playlist.songs.length > 0) {
+      onPlaySong(playlist.songs[0], playlist.songs);
     }
   };
 
@@ -71,10 +83,7 @@ export const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         {playlists.map(playlist => (
           <Card
             key={playlist.id}
-            className={`p-4 cursor-pointer transition-all duration-300 hover:bg-music-surface-hover group ${
-              selectedPlaylist?.id === playlist.id ? 'ring-2 ring-primary' : ''
-            }`}
-            onClick={() => onSelectPlaylist(playlist)}
+            className="p-4 transition-all duration-300 hover:bg-muted/50 group"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -88,7 +97,56 @@ export const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                   </p>
                 </div>
               </div>
+              <div className="flex gap-2">
+                {playlist.songs.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handlePlayPlaylist(playlist)}
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onDeletePlaylist(playlist.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
+            
+            {/* Song list for the playlist */}
+            {playlist.songs.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Musiques:</h4>
+                {playlist.songs.map(song => (
+                  <div key={song.id} className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded">
+                    <div>
+                      <span className="font-medium">{song.title}</span>
+                      {song.artist && <span className="text-muted-foreground"> - {song.artist}</span>}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onPlaySong(song)}
+                      >
+                        <Play className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onRemoveSongFromPlaylist(song.id, playlist.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         ))}
       </div>
